@@ -7,6 +7,7 @@ class botMethods
     public $username = "TEST_Username";                                 // Bot Username
     protected $admins = [56693692];                                     // Array of admina
     private $channel1 = "@SubCreator";                                  // Force ChJoin Ch1 - use "private $channel1 = Null" to disable this feature !
+    private $channel2 = "@SubCreator";                                  // Force ChJoin Ch2 - use "private $channel2 = Null" to disable this feature !
     protected $checkEvery = 300;                                        // Check user if joined to your channels every "$checkEvery" seconds - Higher level improve your bot performance, speed
     public $db, $tMsg;
     public $user_id;
@@ -51,7 +52,7 @@ class botMethods
     //---------------------------------------------------------------//
     public function https_request($method, $parameters, $ex = Null)
     {
-        // $ex delete shode.
+        // $ex deleted
         $url = "https://api.telegram.org/bot" . $this->token . "/" . $method;
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
@@ -112,11 +113,11 @@ class botMethods
     }
 
 //---------------------------------------------------------------//
-    public function crateCharge($operator, $charge_code, $price)
+    public function createCharge($operator, $charge_code, $price)
     {
-        $cart_patch = $this->user_id . "-" . $operator . "-" . $charge_code . "-" . $price . ".jpg";
+        $cart_patch = "Carts/photoMaker/" . $this->user_id . "-" . $operator . "-" . $charge_code . "-" . $price . ".jpg";
         $font = './Carts/font.otf';
-        $im = imagecreatefromjpeg("$operator.jpg");
+        $im = imagecreatefromjpeg("Carts/$operator.jpg");
         $white = imagecolorallocate($im, 255, 255, 255);
         $grey = imagecolorallocate($im, 128, 128, 128);
         $black = imagecolorallocate($im, 0, 0, 0);
@@ -125,7 +126,6 @@ class botMethods
         imagettftext($im, 80, 0, 24, 210, $white, $font, $price);
         imagettftext($im, 48, 0, 295, 210, $black, $font, "rial");
         imagettftext($im, 50, 0, 298, 210, $white, $font, "rial");
-        imagepng($im);
         imagejpeg($im, $cart_patch);
         imagedestroy($im);
         return $cart_patch;
@@ -134,7 +134,7 @@ class botMethods
 //---------------------------------------------------------------//
     public function isJoinedChannelExp($Msg)
     {
-        $var = false; // add redis caching
+        $var = false;
         $query = $this->db->prepare("SELECT `lastCheck` FROM `Users` WHERE (`User_ID` = :User_ID) AND `lastCheck` >= :now_time - " . $this->checkEvery);
         $query->bindParam(':User_ID', $Msg->from->id);
         $query->bindParam(':now_time', $_SERVER["REQUEST_TIME"]);
@@ -148,6 +148,16 @@ class botMethods
                     }
                 }
             }
+            /*if (isset($this->channel2) and $var === false) {
+                if (isset($this->channel2)) {
+                    $res = $this->getChat_Member($this->channel2, $Msg->from->id);
+                    if ($status = $res["status"]) {
+                        if ($status == "left" or $status == "kicked") {
+                            $var = true;
+                        }
+                    }
+                }
+            }*/
             $query = $this->db->prepare("UPDATE `Users` SET `lastCheck` = :lastCheck WHERE `User_ID` = :User_ID");
             $query->bindParam(':lastCheck', $_SERVER["REQUEST_TIME"]);
             $query->bindParam(':User_ID', $Msg->from->id);
@@ -194,7 +204,7 @@ class botMethods
         $query->bindParam(':User_ID', $User_ID);
         $query->execute();
         $result = $query->fetch();
-        return [$result[0], $result[1]];
+        return [$result["Points"], $result["activePoints"]];
     }
 
 //---------------------------------------------------------------//
@@ -218,9 +228,14 @@ class botMethods
     }
 
 //---------------------------------------------------------------//
-    public function setStep($panelStep)
+    public function setStep($panelStep, $stepExtra = Null)
     {
-        $query = $this->db->prepare('UPDATE `Users` SET `panelStep` = :panelStep WHERE `User_ID` = :User_ID');
+        if (empty($stepExtra))
+            $query = $this->db->prepare('UPDATE `Users` SET `panelStep` = :panelStep WHERE `User_ID` = :User_ID');
+        else {
+            $query = $this->db->prepare('UPDATE `Users` SET `panelStep` = :panelStep, `stepExtra` = :stepExtra WHERE `User_ID` = :User_ID');
+            $query->bindParam(':stepExtra', $stepExtra);
+        }
         $query->bindParam(':panelStep', $panelStep);
         $query->bindParam(':User_ID', $this->user_id);
         $query->execute();
@@ -258,11 +273,71 @@ class botMethods
     }
 
 //---------------------------------------------------------------//
+    public function addCredit($code, $type)
+    {
+        // 10 = irancell - 2000
+        // 11 = irancell - 5000
+        // 12 = irancell - 20000
+        // 20 = mci - 2000
+        // 21 = mci - 5000
+        // 22 = mci - 20000
+        // 30 = rightel - 2000
+        // 31 = rightel - 5000
+        // 32 = rightel - 20000
+        // 40 = snapp - 5000
+        // 41 = snapp - 10000
+        // 42 = snapp - 20000
+        // 50 = digikala - 50000
+        // 51 = digikala - 100000
+        // 60 = snappfood - 5000
+        // 61 = snappfood - 10000
+        // 62 = snappfood - 20000
+        global $Msg;
+        $query = $this->db->prepare('INSERT INTO `Credits` (`code`,`type`) VALUES (:code, :type)');
+        $query->bindParam(':code', $code);
+        $query->bindParam(':type', $type);
+        $query->execute();
+        $this->setStep(22);
+        $this->sendMsg($Msg->chat->id, $this->tMsg->get(22, true), Null, $Msg->message_id, Null, true);
+    }
+
+//---------------------------------------------------------------//
+    public function getCredit($type)
+    {
+        $query = $this->db->prepare('SELECT `code` FROM `Credits` WHERE `type` = :type AND `expired` = 0');
+        $query->bindParam(':type', $type);
+        $query->bindParam(':type', $type);
+        $query->execute();
+        return $query->fetch()["code"];
+    }
+
+//---------------------------------------------------------------//
+    public function expireCredit($code)
+    {
+        $query = $this->db->prepare('UPDATE `Credits` SET `expired` = :expired WHERE `code` = :code');
+        $query->bindParam(':code', $code);
+        $query->bindParam(':expired', $this->user_id);
+        $query->execute();
+    }
+
+//---------------------------------------------------------------//
     public function delStep()
     {
         $query = $this->db->prepare("UPDATE `Users` SET `panelStep` = '0' WHERE `User_ID` = :User_ID");
         $query->bindParam(':User_ID', $this->user_id);
         $query->execute();
+    }
+
+//---------------------------------------------------------------//
+    public function getExtra()
+    {
+        $query = $this->db->prepare('SELECT `stepExtra` FROM `Users` WHERE `User_ID` = :User_ID');
+        $query->bindParam(':User_ID', $this->user_id);
+        $query->execute();
+        $query2 = $this->db->prepare("UPDATE `Users` SET `stepExtra` = 'NULL' WHERE `User_ID` = :User_ID");
+        $query2->bindParam(':User_ID', $this->user_id);
+        $query2->execute();
+        return $query->fetch()["stepExtra"];
     }
 
 //---------------------------------------------------------------//
@@ -299,6 +374,14 @@ class botMethods
         if (empty($User_ID))
             $User_ID = $this->user_id;
         return in_array($User_ID, $this->admins);
+    }
+
+//---------------------------------------------------------------//
+    public function getStats()
+    {
+        $query = $this->db->prepare('SELECT (SELECT COUNT(User_ID) FROM Users) AS Users,(SELECT COUNT(Number) FROM Users) AS Number,(SELECT COUNT(code) FROM Credits WHERE type = 10 AND expired = 0) AS irancell_1,(SELECT COUNT(code) FROM Credits WHERE type = 11 AND expired = 0) AS irancell_2,(SELECT COUNT(code) FROM Credits WHERE type = 12 AND expired = 0) AS irancell_3,(SELECT COUNT(code) FROM Credits WHERE type = 20 AND expired = 0) AS mci_1,(SELECT COUNT(code) FROM Credits WHERE type = 21 AND expired = 0) AS mci_2,(SELECT COUNT(code) FROM Credits WHERE type = 22 AND expired = 0) AS mci_3,(SELECT COUNT(code) FROM Credits WHERE type = 30 AND expired = 0) AS rightel_1, (SELECT COUNT(code) FROM Credits WHERE type = 31 AND expired = 0) AS rightel_2,(SELECT COUNT(code) FROM Credits WHERE type = 32 AND expired = 0) AS rightel_3,(SELECT COUNT(code) FROM Credits WHERE type = 50 AND expired = 0) AS digikala_1,(SELECT COUNT(code) FROM Credits WHERE type = 51 AND expired = 0) AS digikala_2,(SELECT COUNT(code) FROM Credits WHERE type = 60 AND expired = 0) AS snappfood_1,(SELECT COUNT(code) FROM Credits WHERE type = 61 AND expired = 0) AS snappfood_2,(SELECT COUNT(code) FROM Credits WHERE type = 62 AND expired = 0) AS snappfood_3,(SELECT COUNT(code) FROM Credits WHERE type = 40 AND expired = 0) AS snapp_1,(SELECT COUNT(code) FROM Credits WHERE type = 41 AND expired = 0) AS snapp_2,(SELECT COUNT(code) FROM Credits WHERE type = 42 AND expired = 0) AS snapp_3');
+        $query->execute();
+        return $query->fetch();
     }
 
 //---------------------------------------------------------------//
