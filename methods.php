@@ -5,7 +5,7 @@ class botMethods
 {
     protected $token = "123456789:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"; // Bot Token
     public $username = "TEST_Username";                                 // Bot Username
-    protected $admins = [56693692];                                     // Array of admins - First admin = primary admin
+    public $admins = [56693692];                                     // Array of admins - First admin = primary admin
     private $channel1 = "@SubCreator";                                  // Force ChJoin Ch1 - use "private $channel1 = Null" to disable this feature !
     protected $checkEvery = 300;                                        // Check user if joined to your channels every "$checkEvery" seconds - Higher level improve your bot performance, speed
     public $db, $tMsg;
