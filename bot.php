@@ -8,7 +8,6 @@ if (isset($msg->message)) {
     if ($Msg->chat->type === "private") {
         $bot->user_id = $Msg->chat->id;
         if (preg_match("/^\/start$|^\/start (.*)/", $Msg->text, $matches)) {
-            //send bot ads ezafe she
             if (empty($matches[1])) {
                 $bot->updateUsers(isset($Msg->from->username) ? strtolower($Msg->from->username) : NULL, isset($Msg->from->first_name) ? $Msg->from->first_name : NULL, $Msg->from->id);
                 if (empty($bot->getNumber())) {
